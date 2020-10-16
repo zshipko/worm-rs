@@ -5,7 +5,7 @@ pub fn handler_derive(s: synstructure::Structure) -> proc_macro::TokenStream {
     for attr in s.ast().attrs.iter() {
         let meta = attr.parse_meta().unwrap();
         if let syn::Meta::List(list) = meta {
-            if list.path.segments.first().unwrap().ident == "worm" {
+            if list.path.segments.first().unwrap().ident == "commands" {
                 for m in list.nested {
                     match m {
                         syn::NestedMeta::Meta(syn::Meta::Path(p)) => {

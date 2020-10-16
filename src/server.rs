@@ -15,7 +15,9 @@ pub struct Server<T> {
     data: T,
 }
 
-pub struct Func<T>(std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Result<Value, Error>>);
+pub type Response = Result<Value, Error>;
+
+pub struct Func<T>(std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Response>);
 
 pub struct Commands<'a, T>(std::collections::BTreeMap<&'a str, Func<T>>);
 
@@ -34,7 +36,7 @@ impl <'a, T> Commands<'a, T> {
         Commands(Default::default())
     }
 
-    pub fn add<F: 'static + Fn(&mut T, &mut Client, Command) -> Result<Value, Error>>(mut self, key: &'a str, f: F) -> Self {
+    pub fn add<F: 'static + Fn(&mut T, &mut Client, Command) -> Response>(mut self, key: &'a str, f: F) -> Self {
         self.0.insert(key, Func(std::sync::Arc::new(f)));
         self
     }
