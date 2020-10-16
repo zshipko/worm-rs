@@ -2,10 +2,10 @@ pub(crate) mod internal {
     pub use std::marker::Unpin;
 
     pub use async_recursion::async_recursion;
-    pub use futures_lite::AsyncBufReadExt;
-    pub use smol::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
+    pub use futures::io::AsyncBufReadExt;
+    pub use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt, BufReader, BufWriter};
 
-    pub use smol::prelude::*;
+    pub use tokio::prelude::*;
 
     pub use crate::*;
 }

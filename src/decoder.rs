@@ -27,8 +27,12 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         self.input.into_inner()
     }
 
+    fn skip(&mut self, n: usize) {
+        AsyncBufRead::consume(std::pin::Pin::new(&mut self.input), n);
+    }
+
     fn skip_crlf(&mut self) {
-        self.input.consume(2);
+        self.skip(2)
     }
 
     async fn get_line(&mut self) -> Result<String, Error> {
@@ -118,7 +122,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         let len = self.get_number::<usize>().await?;
 
         // TODO: do something with the string type, here we are skipping it
-        self.input.consume(4);
+        self.skip(4);
 
         let mut dest = vec![0; len];
         self.input.read_exact(&mut dest).await?;

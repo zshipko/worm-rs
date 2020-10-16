@@ -40,28 +40,21 @@ impl<T: 'static + Handler + Send> Server<T> {
         }
     }
 
-    pub fn run<A: smol::net::AsyncToSocketAddrs>(self, addr: A) -> Result<(), Error> {
-        smol::block_on(async {
-            let conn = smol::net::TcpListener::bind(addr).await?;
-            let data = std::sync::Arc::new(std::sync::Mutex::new(self.data));
-            let mut incoming = conn.incoming();
-            while let Some(stream) = incoming.next().await {
-                let stream = stream?;
+    pub async fn run<A: tokio::net::ToSocketAddrs>(self, addr: A) -> Result<(), Error> {
+        let conn = tokio::net::TcpListener::bind(addr).await?;
+        let data = std::sync::Arc::new(std::sync::Mutex::new(self.data));
+        loop {
+            let (socket, addr) = conn.accept().await?;
+            let data = data.clone();
+            tokio::spawn(async move {
                 let data = data.clone();
-                smol::spawn(async move {
-                    let data = data.clone();
-                    let mut client = Client::new_from_stream(stream, vec![], None).await.unwrap();
-                    loop {
-                        if let Err(_) = on_command(Handle(data.clone()), &mut client).await {
-                            break
-                        }
+                let mut client = Client::new_from_stream(socket, vec![addr], None).await.unwrap();
+                loop {
+                    if let Err(_) = on_command(Handle(data.clone()), &mut client).await {
+                        break
                     }
-                }).detach();
-            }
-            let r: Result<(), Error> = Ok(());
-            r
-        })?;
-
-        Ok(())
+                }
+            });
+        }
     }
 }

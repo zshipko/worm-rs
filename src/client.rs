@@ -1,15 +1,15 @@
 use crate::internal::*;
 
 pub struct Client {
-    addrs: Vec<smol::net::SocketAddr>,
+    addrs: Vec<std::net::SocketAddr>,
     auth: Option<(String, String)>,
-    output: Encoder<smol::io::WriteHalf<smol::net::TcpStream>>,
-    input: Decoder<smol::io::ReadHalf<smol::net::TcpStream>>,
+    output: Encoder<tokio::io::WriteHalf<tokio::net::TcpStream>>,
+    input: Decoder<tokio::io::ReadHalf<tokio::net::TcpStream>>,
 }
 
 impl Client {
-    pub(crate) async fn new_from_stream(stream: smol::net::TcpStream, addrs: Vec<smol::net::SocketAddr>, auth: Option<(&str, &str)>) -> Result<Client, Error> {
-        let (r, w) = smol::io::split(stream);
+    pub(crate) async fn new_from_stream(stream: tokio::net::TcpStream, addrs: Vec<std::net::SocketAddr>, auth: Option<(&str, &str)>) -> Result<Client, Error> {
+        let (r, w) = tokio::io::split(stream);
         let output = Encoder::new(w);
         let input = Decoder::new(r);
 
@@ -25,9 +25,9 @@ impl Client {
 
     }
 
-    pub async fn new<T: smol::net::AsyncToSocketAddrs>(x: T, auth: Option<(&str, &str)>) -> Result<Client, Error> {
-        let addrs = smol::net::resolve(x).await?;
-        let mut client = Self::new_from_stream(smol::net::TcpStream::connect(addrs.as_slice()).await?, addrs, auth).await?;
+    pub async fn new<T: tokio::net::ToSocketAddrs>(x: T, auth: Option<(&str, &str)>) -> Result<Client, Error> {
+        let addrs = tokio::net::lookup_host(x).await?.collect::<Vec<_>>();
+        let mut client = Self::new_from_stream(tokio::net::TcpStream::connect(addrs.as_slice()).await?, addrs, auth).await?;
 
         let cmd = Command::new("HELLO").arg("3");
 
