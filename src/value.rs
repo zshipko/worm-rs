@@ -196,6 +196,15 @@ impl From<()> for Value {
     }
 }
 
+impl<T: Into<Value>> From<Option<T>> for Value {
+    fn from(x: Option<T>) -> Value {
+        match x {
+            Some(x) => x.into(),
+            None => Value::Null,
+        }
+    }
+}
+
 impl std::convert::TryFrom<Value> for () {
     type Error = Error;
 

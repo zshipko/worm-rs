@@ -1,31 +1,39 @@
 use crate::internal::*;
 
-pub struct Handle<T: Sync + Send + Sized>(std::sync::Arc<std::sync::Mutex<std::sync::Arc<T>>>);
+pub struct Handle<T: Sized>(std::sync::Arc<std::sync::Mutex<T>>);
 
-unsafe impl<T: Sync + Send> Send for Handle<T> {}
-unsafe impl<T: Sync + Send> Sync for Handle<T> {}
+impl<T: Sized> Handle<T> {
+    pub fn lock(&self) -> std::sync::MutexGuard<T> {
+        self.0.lock().unwrap()
+    }
+}
 
-pub struct Server<T: Sync + Send> {
+unsafe impl<T> Send for Handle<T> {}
+unsafe impl<T> Sync for Handle<T> {}
+
+pub struct Server<T> {
     data: T,
 }
 
 #[async_trait::async_trait]
-pub trait Handler: Sized + Sync + Send {
+pub trait Handler: Sized {
     async fn handle(handle: Handle<Self>, client: &Client, command: Command) ->  Result<Value, Error>;
 }
 
-async fn on_command<T: Handler + Sync + Send>(data: Handle<T>, client: &mut Client) -> Result<(), Error> {
+async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<(), Error> {
     let value = client.read().await?;
-    println!("{:?}", value);
-    if let Value::Array(cmd) = value {
-        let res = T::handle(data, client, Command(cmd)).await?;
-        client.write(&res).await?;
-        client.flush().await?;
+    if let Value::Array(mut cmd) = value {
+        let name = cmd.remove(0);
+        if let Value::String(s) = name {
+            let res = T::handle(data, client, Command(s, cmd)).await?;
+            client.write(&res).await?;
+            client.flush().await?;
+        }
     }
     Ok(())
 }
 
-impl<T: 'static + Handler + Sync + Send> Server<T> {
+impl<T: 'static + Handler + Send> Server<T> {
     pub fn new(data: T) -> Self {
         Server {
             data,
@@ -35,7 +43,7 @@ impl<T: 'static + Handler + Sync + Send> Server<T> {
     pub fn run<A: smol::net::AsyncToSocketAddrs>(self, addr: A) -> Result<(), Error> {
         smol::block_on(async {
             let conn = smol::net::TcpListener::bind(addr).await?;
-            let data = std::sync::Arc::new(std::sync::Mutex::new(std::sync::Arc::new(self.data)));
+            let data = std::sync::Arc::new(std::sync::Mutex::new(self.data));
             let mut incoming = conn.incoming();
             while let Some(stream) = incoming.next().await {
                 let stream = stream?;

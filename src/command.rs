@@ -1,21 +1,26 @@
 use crate::internal::*;
 
 #[derive(Debug, Default)]
-pub struct Command(pub Vec<Value>);
+pub struct Command(pub String, pub Vec<Value>);
 
 impl Command {
-    pub fn new(name: impl AsRef<str>) -> Command {
-        Command(vec![name.as_ref().into()])
+    pub fn new(name: impl Into<String>) -> Command {
+        Command(name.into(), vec![])
     }
 
     pub fn arg(mut self, x: impl Into<String>) -> Command {
-        self.0.push(x.into().into());
+        self.1.push(x.into().into());
         self
+    }
+
+    pub fn name(&self) -> &str {
+        self.0.as_str()
     }
 }
 
 impl From<Command> for Value {
-    fn from(cmd: Command) -> Value {
-        Value::Array(cmd.0)
+    fn from(mut cmd: Command) -> Value {
+        cmd.1.insert(0, cmd.0.into());
+        Value::Array(cmd.1)
     }
 }
