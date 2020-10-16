@@ -1,7 +1,7 @@
 use worm::*;
 
 #[derive(Default, worm::Handler)]
-#[commands(get, set, del)]
+#[commands(get, set, del, get)]
 pub struct KV {
     store: Map,
 }

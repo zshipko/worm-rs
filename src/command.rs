@@ -24,6 +24,12 @@ impl Command {
     pub fn args_mut(&mut self) -> &mut Vec<Value> {
         &mut self.1
     }
+
+    pub fn into_vec(mut self) -> Vec<Value> {
+        let x = self.0.into();
+        self.1.insert(0, x);
+        self.1
+    }
 }
 
 impl From<Command> for Value {

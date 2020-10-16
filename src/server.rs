@@ -17,17 +17,21 @@ pub struct Server<T> {
 
 pub type Response = Result<Value, Error>;
 
-pub struct Func<T>(std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Response>);
+pub struct Func<T>(pub std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Response>);
 
 pub struct Commands<'a, T>(std::collections::BTreeMap<&'a str, Func<T>>);
 
 #[macro_export]
 macro_rules! commands {
     ($($x:ident),*$(,)?) => {
-        $crate::Commands::new()
-        $(
-            .add(stringify!($x), Self::$x)
-        )*
+        fn command(&self, name: &str) -> Option<Func<Self>> {
+            match name {
+                $(
+                    stringify!($x) => Some($crate::Func(std::sync::Arc::new(Self::$x))),
+                )*
+                _ => None
+            }
+        }
     }
 }
 
@@ -48,10 +52,10 @@ impl <'a, T> Commands<'a, T> {
 
 #[async_trait::async_trait]
 pub trait Handler: Send + Sized {
-    fn commands(&self) -> Commands<Self>;
+    fn command(&self, name: &str) -> Option<Func<Self>>;
 
     async fn handle(handle: Handle<Self>, client: &mut Client, command: Command) ->  Result<Value, Error> {
-        let cmd = handle.lock().commands().get(command.name()).map(|cmd| cmd.0.clone());
+        let cmd = handle.lock().command(command.name()).map(|cmd| cmd.0.clone());
         if let Some(cmd) = cmd {
             (cmd)(&mut handle.lock(), client, command)
         } else {

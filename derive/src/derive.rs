@@ -20,9 +20,7 @@ pub fn handler_derive(s: synstructure::Structure) -> proc_macro::TokenStream {
 
     s.gen_impl(quote! {
         gen impl worm::Handler for @Self {
-            fn commands(&self) -> worm::Commands<Self> {
-                worm::commands!(#(#commands),*)
-            }
+            worm::commands!(#(#commands),*);
         }
     })
     .into()
