@@ -1,6 +1,6 @@
 # worm-rs
 
-async RESP3 parser for Rust
+Async RESP3 parser, client and server
 
 ## Limitations
 - Assumes an `Attribute` is always followed by a valid `Value`
