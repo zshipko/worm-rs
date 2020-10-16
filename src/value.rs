@@ -30,6 +30,10 @@ impl Value {
         Value::Error(x.into())
     }
 
+    pub fn ok() -> Value {
+        Value::String("OK".into())
+    }
+
     pub async fn write<W: Send + Unpin + AsyncWrite>(&self, w: &mut W) -> Result<(), Error> {
         let mut enc = Encoder::new(w);
         enc.encode(self).await?;

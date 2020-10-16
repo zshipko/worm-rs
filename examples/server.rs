@@ -1,26 +1,32 @@
 use worm::*;
 
-#[derive(Default)]
+#[derive(Default, worm::Handler)]
+#[worm(get, set, del)]
 pub struct KV {
-    store: std::collections::BTreeMap<String, String>
+    store: Map,
 }
 
-#[async_trait::async_trait]
-impl Handler for KV {
-    async fn handle(handle: Handle<Self>, _client: &Client, command: Command) ->  Result<Value, Error> {
-        match command.name() {
-            "set" => {
-                handle.lock().store.insert("Test".to_string(), "Value".to_string());
-                Ok("OK".into())
-            }
-            "get" => {
-                Ok(handle.lock().store.get("Test").cloned().into())
-            }
-            _ => Ok(command.into())
-        }
+impl KV {
+    fn set(&mut self, _client: &mut Client, command: Command) -> Result<Value, Error> {
+        let args = command.args();
+        self.store.insert(args[0].clone(), args[1].clone());
+        Ok(Value::ok())
+    }
+
+    fn get(&mut self, _client: &mut Client, command: Command) -> Result<Value, Error> {
+        let args = command.args();
+        Ok(self.store.get(&args[0]).cloned().into())
+    }
+
+
+    fn del(&mut self, _client: &mut Client, command: Command) -> Result<Value, Error> {
+        let args = command.args();
+        self.store.remove(&args[0]);
+        Ok(Value::ok())
     }
 }
 
-pub fn main() {
-    Server::new(KV::default()).run("127.0.0.1:8080").unwrap();
+#[tokio::main]
+pub async fn main() -> Result<(), Error> {
+    Server::new(KV::default()).run("127.0.0.1:8080").await
 }

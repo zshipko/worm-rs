@@ -16,6 +16,14 @@ impl Command {
     pub fn name(&self) -> &str {
         self.0.as_str()
     }
+
+    pub fn args(&self) -> &[Value] {
+        &self.1
+    }
+
+    pub fn args_mut(&mut self) -> &mut Vec<Value> {
+        &mut self.1
+    }
 }
 
 impl From<Command> for Value {

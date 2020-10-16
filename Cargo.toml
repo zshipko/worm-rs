@@ -11,3 +11,4 @@ thiserror = "1"
 ordered-float = "2"
 async-recursion = "0.3"
 async-trait = "0.1"
+worm-derive = {path = "./derive", version = "0.1"}

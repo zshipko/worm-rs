@@ -1,0 +1,18 @@
+[package]
+name = "worm-derive"
+version = "0.1.0"
+authors = ["Zach Shipko <zachshipko@gmail.com>"]
+edition = "2018"
+license = "ISC"
+repository = "https://github.com/zshipko/worm-rs"
+documentation = "https://docs.rs/worm-derive"
+readme = "./README.md"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+syn = {version = "1", features = ["full"]}
+proc-macro2 = {version = "1"}
+synstructure = "0.12"
+quote = "1"

@@ -15,9 +15,47 @@ pub struct Server<T> {
     data: T,
 }
 
+pub struct Func<T>(std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Result<Value, Error>>);
+
+pub struct Commands<'a, T>(std::collections::BTreeMap<&'a str, Func<T>>);
+
+#[macro_export]
+macro_rules! commands {
+    ($($x:ident),*$(,)?) => {
+        $crate::Commands::new()
+        $(
+            .add(stringify!($x), Self::$x)
+        )*
+    }
+}
+
+impl <'a, T> Commands<'a, T> {
+    pub fn new() -> Self {
+        Commands(Default::default())
+    }
+
+    pub fn add<F: 'static + Fn(&mut T, &mut Client, Command) -> Result<Value, Error>>(mut self, key: &'a str, f: F) -> Self {
+        self.0.insert(key, Func(std::sync::Arc::new(f)));
+        self
+    }
+
+    pub fn get(&self, name: &str) -> Option<&Func<T>> {
+        self.0.get(name)
+    }
+}
+
 #[async_trait::async_trait]
-pub trait Handler: Sized {
-    async fn handle(handle: Handle<Self>, client: &Client, command: Command) ->  Result<Value, Error>;
+pub trait Handler: Send + Sized {
+    fn commands(&self) -> Commands<Self>;
+
+    async fn handle(handle: Handle<Self>, client: &mut Client, command: Command) ->  Result<Value, Error> {
+        let cmd = handle.lock().commands().get(command.name()).map(|cmd| cmd.0.clone());
+        if let Some(cmd) = cmd {
+            (cmd)(&mut handle.lock(), client, command)
+        } else {
+            Ok(Value::error("NOCOMMAND invalid command"))
+        }
+    }
 }
 
 async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<(), Error> {
