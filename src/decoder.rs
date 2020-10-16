@@ -4,7 +4,11 @@ pub struct Decoder<T> {
     pub input: BufReader<T>,
 }
 
-impl<T: AsyncRead + Unpin> Decoder<T> {
+unsafe impl<T> Send for Decoder<T> {}
+unsafe impl<T> Sync for Decoder<T> {}
+
+
+impl<T: AsyncRead + Unpin + Send> Decoder<T> {
     pub fn new(x: T) -> Self {
         Decoder {
             input: BufReader::new(x),
@@ -203,7 +207,7 @@ impl<T: AsyncRead + Unpin> Decoder<T> {
         Ok(Value::Push(kind, arr))
     }
 
-    #[async_recursion(?Send)]
+    #[async_recursion]
     pub async fn decode(&mut self) -> Result<Value, Error> {
         let prefix = &mut [0u8];
         self.input.read_exact(prefix).await?;

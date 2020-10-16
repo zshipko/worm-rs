@@ -30,13 +30,13 @@ impl Value {
         Value::Error(x.into())
     }
 
-    pub async fn write<W: Unpin + AsyncWrite>(&self, w: &mut W) -> Result<(), Error> {
+    pub async fn write<W: Send + Unpin + AsyncWrite>(&self, w: &mut W) -> Result<(), Error> {
         let mut enc = Encoder::new(w);
         enc.encode(self).await?;
         enc.flush().await
     }
 
-    pub async fn read<R: Unpin + AsyncRead>(r: &mut R) -> Result<Value, Error> {
+    pub async fn read<R: Send + Unpin + AsyncRead>(r: &mut R) -> Result<Value, Error> {
         let mut d = Decoder::new(r);
         d.decode().await
     }

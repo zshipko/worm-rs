@@ -4,7 +4,12 @@ pub struct Encoder<T> {
     pub output: BufWriter<T>,
 }
 
-impl<T: Unpin + AsyncWrite> Encoder<T> {
+
+unsafe impl<T> Send for Encoder<T> {}
+unsafe impl<T> Sync for Encoder<T> {}
+
+
+impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
     pub fn new(x: T) -> Self {
         Encoder {
             output: BufWriter::new(x),
@@ -143,7 +148,7 @@ impl<T: Unpin + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    #[async_recursion(?Send)]
+    #[async_recursion]
     pub async fn encode(&mut self, value: &Value) -> Result<(), Error> {
         match value {
             Value::Null => self.write_null().await,
