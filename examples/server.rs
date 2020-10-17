@@ -1,7 +1,8 @@
 use worm::*;
 
 #[derive(Default, worm::Handler)]
-#[commands(get, set, del, get)]
+#[commands(get, set, del)]
+#[password(authorize)]
 pub struct KV {
     store: Map,
 }
@@ -18,11 +19,14 @@ impl KV {
         Ok(self.store.get(&args[0]).cloned().into())
     }
 
-
     fn del(&mut self, _client: &mut Client, command: Command) -> Result<Value, Error> {
         let args = command.args();
         self.store.remove(&args[0]);
         Ok(Value::ok())
+    }
+
+    fn authorize(&self, user: &str, pass: &str) -> bool {
+        user == "test" && pass == "test"
     }
 }
 

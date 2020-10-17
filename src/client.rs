@@ -5,10 +5,16 @@ pub struct Client {
     auth: Option<(String, String)>,
     output: Encoder<tokio::io::WriteHalf<tokio::net::TcpStream>>,
     input: Decoder<tokio::io::ReadHalf<tokio::net::TcpStream>>,
+    pub(crate) authenticated: bool,
 }
 
 impl Client {
-    pub(crate) async fn new_from_stream(stream: tokio::net::TcpStream, addrs: Vec<std::net::SocketAddr>, auth: Option<(&str, &str)>) -> Result<Client, Error> {
+    pub(crate) async fn new_from_stream(
+        stream: tokio::net::TcpStream,
+        addrs: Vec<std::net::SocketAddr>,
+        auth: Option<(&str, &str)>,
+        authenticated: bool,
+    ) -> Result<Client, Error> {
         let (r, w) = tokio::io::split(stream);
         let output = Encoder::new(w);
         let input = Decoder::new(r);
@@ -18,16 +24,24 @@ impl Client {
             output,
             input,
             auth: auth.map(|(a, b)| (a.into(), b.into())),
+            authenticated,
         };
 
-
         Ok(client)
-
     }
 
-    pub async fn new<T: tokio::net::ToSocketAddrs>(x: T, auth: Option<(&str, &str)>) -> Result<Client, Error> {
+    pub async fn new<T: tokio::net::ToSocketAddrs>(
+        x: T,
+        auth: Option<(&str, &str)>,
+    ) -> Result<Client, Error> {
         let addrs = tokio::net::lookup_host(x).await?.collect::<Vec<_>>();
-        let mut client = Self::new_from_stream(tokio::net::TcpStream::connect(addrs.as_slice()).await?, addrs, auth).await?;
+        let mut client = Self::new_from_stream(
+            tokio::net::TcpStream::connect(addrs.as_slice()).await?,
+            addrs,
+            auth,
+            false,
+        )
+        .await?;
 
         let cmd = Command::new("HELLO").arg("3");
 
@@ -42,6 +56,8 @@ impl Client {
         if info.as_map().is_none() {
             return Err(Error::InvalidValue(info));
         }
+
+        client.authenticated = true;
 
         Ok(client)
     }
@@ -69,7 +85,11 @@ impl Client {
     }
 
     pub async fn command(&mut self, args: impl AsRef<[&str]>) -> Result<Value, Error> {
-        let args = args.as_ref().iter().map(|x| Value::from(*x)).collect::<Vec<_>>();
+        let args = args
+            .as_ref()
+            .iter()
+            .map(|x| Value::from(*x))
+            .collect::<Vec<_>>();
         self.exec(&Value::Array(args)).await
     }
 }

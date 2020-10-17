@@ -72,8 +72,8 @@ impl Value {
             Value::String(s) => match s.parse() {
                 Ok(x) => Some(x),
                 Err(_) => None,
-            }
-            _ => None
+            },
+            _ => None,
         }
     }
 
@@ -96,8 +96,8 @@ impl Value {
             Value::String(s) => match s.parse() {
                 Ok(x) => Some(x),
                 Err(_) => None,
-            }
-            _ => None
+            },
+            _ => None,
         }
     }
 
@@ -145,7 +145,7 @@ impl Value {
         match self {
             Value::Bytes(x) => Some(x.as_slice()),
             Value::String(s) => Some(s.as_bytes()),
-            _ => None
+            _ => None,
         }
     }
 

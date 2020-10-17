@@ -7,7 +7,6 @@ pub struct Decoder<T> {
 unsafe impl<T> Send for Decoder<T> {}
 unsafe impl<T> Sync for Decoder<T> {}
 
-
 impl<T: AsyncRead + Unpin + Send> Decoder<T> {
     pub fn new(x: T) -> Self {
         Decoder {
@@ -69,7 +68,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         let len = self.get_number::<usize>().await?;
         if len == 0 {
             self.skip_crlf();
-            return Ok(Value::String(String::new()))
+            return Ok(Value::String(String::new()));
         }
 
         let mut dest = vec![0; len];

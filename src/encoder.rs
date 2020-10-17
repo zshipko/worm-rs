@@ -4,10 +4,8 @@ pub struct Encoder<T> {
     pub output: BufWriter<T>,
 }
 
-
 unsafe impl<T> Send for Encoder<T> {}
 unsafe impl<T> Sync for Encoder<T> {}
-
 
 impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
     pub fn new(x: T) -> Self {
@@ -34,7 +32,9 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
     }
 
     async fn write_length(&mut self, prefix: char, len: usize) -> Result<(), Error> {
-        self.output.write_all(format!("{}{}\r\n", prefix, len).as_bytes()).await?;
+        self.output
+            .write_all(format!("{}{}\r\n", prefix, len).as_bytes())
+            .await?;
         Ok(())
     }
 
@@ -58,7 +58,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         self.write_crlf().await
     }
 
-    async fn write_float(&mut self, i: &Float)-> Result<(), Error> {
+    async fn write_float(&mut self, i: &Float) -> Result<(), Error> {
         self.output.write_all(b",").await?;
         self.output.write_all(i.to_string().as_bytes()).await?;
         self.write_crlf().await
@@ -72,7 +72,9 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
 
     async fn write_error(&mut self, e: &str) -> Result<(), Error> {
         if e.contains('\r') || e.contains('\n') {
-            self.output.write_all(format!("!{}", e.len()).as_bytes()).await?;
+            self.output
+                .write_all(format!("!{}", e.len()).as_bytes())
+                .await?;
             self.write_crlf().await?;
         } else {
             self.output.write_all(b"-").await?;
@@ -170,4 +172,3 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         }
     }
 }
-
