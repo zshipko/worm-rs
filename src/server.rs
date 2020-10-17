@@ -50,11 +50,48 @@ impl <'a, T> Commands<'a, T> {
     }
 }
 
+const VERSION: &'static str = env!("CARGO_PKG_VERSION");
+
 #[async_trait::async_trait]
 pub trait Handler: Send + Sized {
     fn command(&self, name: &str) -> Option<Func<Self>>;
 
+    fn password_required(&self) -> bool {
+        false
+    }
+
+    fn check_password(&self, _username: &str, _password: &str) -> bool {
+        false
+    }
+
     async fn handle(handle: Handle<Self>, client: &mut Client, command: Command) ->  Result<Value, Error> {
+        if command.name() == "HELLO" || command.name() == "hello" {
+            let args = command.args();
+            if args.len() == 1 {
+                return Ok(Value::error("NOPROTO sorry this protocol version is not supported"));
+            }
+
+            let x = handle.lock();
+            if args.len() >= 4 {
+                let username = args[2].as_string().unwrap();
+                let password = args[3].as_string().unwrap();
+
+                if x.password_required() {
+                    if !x.check_password(username, password) {
+                        return Error::disconnect("ERR invalid password")
+                    }
+                }
+            } else if x.password_required() {
+                return Error::disconnect("ERR password required");
+            }
+
+            return Ok(map!{
+                "server" => "worm",
+                "version" => VERSION,
+                "proto" => 3,
+            })
+        }
+
         let cmd = handle.lock().command(command.name()).map(|cmd| cmd.0.clone());
         if let Some(cmd) = cmd {
             (cmd)(&mut handle.lock(), client, command)
@@ -64,17 +101,24 @@ pub trait Handler: Send + Sized {
     }
 }
 
-async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<(), Error> {
+async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<bool, Error> {
     let value = client.read().await?;
+    let mut response = true;
+
     if let Value::Array(mut cmd) = value {
         let name = cmd.remove(0);
         if let Value::String(s) = name {
-            let res = T::handle(data, client, Command(s, cmd)).await?;
+            let (res, disconnect) = match T::handle(data, client, Command(s, cmd)).await {
+                Ok(x) => (x, false),
+                Err(Error::Disconnect(e)) => (Value::Error(e), true),
+                Err(e) => (Err(e).into(), false),
+            };
+            response = !disconnect;
             client.write(&res).await?;
             client.flush().await?;
         }
     }
-    Ok(())
+    Ok(response)
 }
 
 impl<T: 'static + Handler + Send> Server<T> {
@@ -94,8 +138,9 @@ impl<T: 'static + Handler + Send> Server<T> {
                 let data = data.clone();
                 let mut client = Client::new_from_stream(socket, vec![addr], None).await.unwrap();
                 loop {
-                    if let Err(_) = on_command(Handle(data.clone()), &mut client).await {
-                        break
+                    match on_command(Handle(data.clone()), &mut client).await {
+                        Ok(true) => continue,
+                        Ok(false) | Err(_) => break,
                     }
                 }
             });

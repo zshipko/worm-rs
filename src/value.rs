@@ -66,11 +66,15 @@ impl Value {
     }
 
     pub fn as_int(&self) -> Option<i64> {
-        if let Value::Int(x) = self {
-            return Some(*x);
+        match self {
+            Value::Int(x) => Some(*x),
+            Value::Float(f) => Some(f.into_inner() as i64),
+            Value::String(s) => match s.parse() {
+                Ok(x) => Some(x),
+                Err(_) => None,
+            }
+            _ => None
         }
-
-        None
     }
 
     pub fn as_int_mut(&mut self) -> Option<&mut i64> {
@@ -86,7 +90,15 @@ impl Value {
             return Some((*x).into());
         }
 
-        None
+        match self {
+            Value::Float(x) => Some(x.clone().into()),
+            Value::Int(x) => Some(*x as f64),
+            Value::String(s) => match s.parse() {
+                Ok(x) => Some(x),
+                Err(_) => None,
+            }
+            _ => None
+        }
     }
 
     pub fn as_float_mut(&mut self) -> Option<&mut f64> {
@@ -130,11 +142,11 @@ impl Value {
     }
 
     pub fn as_bytes(&self) -> Option<&[u8]> {
-        if let Value::Bytes(x) = self {
-            return Some(x.as_slice());
+        match self {
+            Value::Bytes(x) => Some(x.as_slice()),
+            Value::String(s) => Some(s.as_bytes()),
+            _ => None
         }
-
-        None
     }
 
     pub fn as_bytes_mut(&mut self) -> Option<&mut Vec<u8>> {

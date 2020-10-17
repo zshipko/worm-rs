@@ -14,4 +14,16 @@ pub enum Error {
 
     #[error("Invalid byte: {0:?}")]
     InvalidByte(Option<u8>),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
+
+    #[error("Disconnect: {0}")]
+    Disconnect(String),
+}
+
+impl Error {
+    pub fn disconnect(s: impl Into<String>) -> Result<crate::Value, Error> {
+        Err(Error::Disconnect(s.into()))
+    }
 }
