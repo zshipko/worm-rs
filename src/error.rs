@@ -1,3 +1,5 @@
+use crate::*;
+
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("I/O error: {0}")]
@@ -10,7 +12,7 @@ pub enum Error {
     ParseFloat(#[from] std::num::ParseFloatError),
 
     #[error("Invalid value: {0:?}")]
-    InvalidValue(crate::Value),
+    InvalidValue(Value),
 
     #[error("Invalid byte: {0:?}")]
     InvalidByte(Option<u8>),
@@ -23,7 +25,16 @@ pub enum Error {
 }
 
 impl Error {
-    pub fn disconnect(s: impl Into<String>) -> Result<crate::Value, Error> {
+    pub fn disconnect(s: impl Into<String>) -> Result<Value, Error> {
         Err(Error::Disconnect(s.into()))
+    }
+
+    pub fn invalid_args(cmd: impl AsRef<str>, got: usize, expected: usize) -> Result<Value, Error> {
+        Ok(Value::Error(format!(
+            "ERR wrong number of arguments for {} command, got {} but expected {}",
+            cmd.as_ref(),
+            got,
+            expected
+        )))
     }
 }

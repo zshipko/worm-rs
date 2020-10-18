@@ -26,11 +26,12 @@ impl KV {
     }
 
     fn authorize(&self, user: &str, pass: &str) -> bool {
-        user == "test" && pass == "test"
+        user == "default" && pass == "test"
     }
 }
 
 #[tokio::main]
 pub async fn main() -> Result<(), Error> {
+    env_logger::init();
     Server::new(KV::default()).run("127.0.0.1:8080").await
 }

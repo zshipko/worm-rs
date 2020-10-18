@@ -4,8 +4,13 @@ use crate::internal::*;
 pub struct Command(pub String, pub Vec<Value>);
 
 impl Command {
-    pub fn new(name: impl Into<String>) -> Command {
-        Command(name.into(), vec![])
+    pub fn new(name: impl AsRef<str>) -> Command {
+        Command(name.as_ref().to_ascii_lowercase(), vec![])
+    }
+
+    pub fn with_args(mut self, x: impl Into<Vec<Value>>) -> Command {
+        self.1 = x.into();
+        self
     }
 
     pub fn arg(mut self, x: impl Into<String>) -> Command {
@@ -29,6 +34,10 @@ impl Command {
         let x = self.0.into();
         self.1.insert(0, x);
         self.1
+    }
+
+    pub fn split(self) -> (String, Vec<Value>) {
+        (self.0, self.1)
     }
 }
 

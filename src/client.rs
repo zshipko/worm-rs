@@ -13,7 +13,6 @@ impl Client {
         stream: tokio::net::TcpStream,
         addrs: Vec<std::net::SocketAddr>,
         auth: Option<(&str, &str)>,
-        authenticated: bool,
     ) -> Result<Client, Error> {
         let (r, w) = tokio::io::split(stream);
         let output = Encoder::new(w);
@@ -24,7 +23,7 @@ impl Client {
             output,
             input,
             auth: auth.map(|(a, b)| (a.into(), b.into())),
-            authenticated,
+            authenticated: false,
         };
 
         Ok(client)
@@ -39,7 +38,6 @@ impl Client {
             tokio::net::TcpStream::connect(addrs.as_slice()).await?,
             addrs,
             auth,
-            false,
         )
         .await?;
 
