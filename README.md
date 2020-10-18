@@ -16,7 +16,8 @@ Async RESP3 parser, client and server ported to Rust from [worm-go](https://gith
 
 ### server
 
-To start the example server:
+The server example is a very basic in memory key-value store
+
 ```shell
 $ cargo run --example server
 ```
@@ -38,3 +39,11 @@ OK
 (nil)
 ```
 
+### ping
+
+Ping the example server
+
+```shell
+$ cargo run --example ping
+String("PONG")
+```

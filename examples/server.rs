@@ -27,12 +27,13 @@ impl KV {
         Ok(Value::ok())
     }
 
-    fn list(&mut self, _client: &mut Client, _command: Command) -> Result<Value, Error> {
+    async fn list(&mut self, client: &mut Client, _command: Command) -> Result<Value, Error> {
+        client.output.write_array_header(self.store.len()).await?;
         let mut keys: Vec<Value> = Vec::new();
         for k in self.store.keys() {
-            keys.push(k.clone());
+            client.write(k).await?;
         }
-        Ok(keys.into())
+        Value::done()
     }
 
     fn authorize(&self, user: &str, pass: &str) -> bool {

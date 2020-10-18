@@ -83,6 +83,14 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         self.write_crlf().await
     }
 
+    pub async fn write_string_value(&mut self, e: impl AsRef<str>) -> Result<(), Error> {
+        self.write_string(e.as_ref().as_bytes()).await
+    }
+
+    pub async fn write_bytes_value(&mut self, e: impl AsRef<[u8]>) -> Result<(), Error> {
+        self.write_string(e.as_ref()).await
+    }
+
     async fn write_string(&mut self, e: &[u8]) -> Result<(), Error> {
         if e.contains(&b'\r') || e.contains(&b'\n') {
             self.write_length('$', e.len()).await?;
@@ -93,8 +101,13 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         self.write_crlf().await
     }
 
+    pub async fn write_array_header(&mut self, n: usize) -> Result<(), Error> {
+        self.write_length('*', n).await?;
+        Ok(())
+    }
+
     async fn write_array(&mut self, arr: &[Value]) -> Result<(), Error> {
-        self.write_length('*', arr.len()).await?;
+        self.write_array_header(arr.len()).await?;
 
         for a in arr {
             self.encode(a).await?;
@@ -103,8 +116,13 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
+    pub async fn write_map_header(&mut self, n: usize) -> Result<(), Error> {
+        self.write_length('%', n).await?;
+        Ok(())
+    }
+
     async fn write_map(&mut self, map: &Map) -> Result<(), Error> {
-        self.write_length('%', map.len()).await?;
+        self.write_map_header(map.len()).await?;
 
         for (k, v) in map.iter() {
             self.encode(k).await?;
@@ -114,8 +132,13 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
+    pub async fn write_set_header(&mut self, n: usize) -> Result<(), Error> {
+        self.write_length('~', n).await?;
+        Ok(())
+    }
+
     async fn write_set(&mut self, set: &Set) -> Result<(), Error> {
-        self.write_length('~', set.len()).await?;
+        self.write_set_header(set.len()).await?;
 
         for a in set.iter() {
             self.encode(a).await?;
@@ -169,6 +192,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
                 self.encode(&value).await
             }
             Value::Push(k, v) => self.write_push(k.as_str(), v.as_slice()).await,
+            Value::Done => Ok(())
         }
     }
 }

@@ -19,11 +19,16 @@ pub enum Value {
     Set(Set),
     Attribute(Map, Box<Value>),
     Push(String, Vec<Value>),
+    Done
 }
 
 impl Value {
     pub fn new(x: impl Into<Value>) -> Value {
         x.into()
+    }
+
+    pub fn done() -> Result<Value, Error> {
+        Ok(Value::Done)
     }
 
     pub fn error(x: impl Into<String>) -> Value {

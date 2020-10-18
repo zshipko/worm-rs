@@ -17,7 +17,8 @@ pub struct Server<T> {
 
 pub type Response = Result<Value, Error>;
 
-pub struct Func<T>(pub std::sync::Arc<dyn Fn(&mut T, &mut Client, Command) -> Response>);
+type FuncType<T> = dyn Send + FnOnce(Handle<T>, &mut Client, Command) -> std::pin::Pin<Box<dyn Send + Sync + std::future::Future<Output = Response>>>;
+pub struct Func<T>(pub std::sync::Arc<FuncType<T>>);
 
 pub struct Commands<'a, T>(std::collections::BTreeMap<&'a str, Func<T>>);
 
@@ -33,7 +34,7 @@ macro_rules! commands {
         fn command(&self, name: &str) -> Option<Func<Self>> {
             match name {
                 $(
-                    stringify!($x) => Some($crate::Func(std::sync::Arc::new(Self::$x))),
+                    stringify!($x) => Some($crate::Func(Self::$x)),
                 )*
                 _ => None
             }
@@ -46,12 +47,12 @@ impl<'a, T> Commands<'a, T> {
         Commands(Default::default())
     }
 
-    pub fn add<F: 'static + Fn(&mut T, &mut Client, Command) -> Response>(
+    pub fn add<F: 'static + Copy + Send + FnOnce(Handle<T>, &mut Client, Command) -> std::pin::Pin<Box<dyn Send + Sync + std::future::Future<Output = Response>>>>(
         mut self,
         key: &'a str,
-        f: F,
+        f: std::sync::Arc<FuncType<T>>,
     ) -> Self {
-        self.0.insert(key, Func(std::sync::Arc::new(f)));
+        self.0.insert(key, Func(f));
         self
     }
 
@@ -84,7 +85,7 @@ pub trait Handler: Send + Sized {
 
         if args.len() >= 3 {
             let auth = args[1].as_string().unwrap();
-            if auth != "auth" || auth != "AUTH" {
+            if auth != "auth" && auth != "AUTH" {
                 return Error::disconnect("ERR invalid hello command, expected AUTH argument");
             }
 
@@ -141,14 +142,12 @@ pub trait Handler: Send + Sized {
     }
 
     fn handle_commands(&mut self, _client: &mut Client, _args: &[Value]) -> Result<Value, Error> {
-        let mut commands: Vec<Value> = self.commands().iter().map(|x| (*x).into()).collect();
-        commands.extend_from_slice(&[
-            "hello".into(),
-            "auth".into(),
-            "ping".into(),
-            "commands".into(),
-        ]);
-        Ok(Value::Array(commands))
+        let mut cmds = self.commands().to_vec();
+        cmds.push("hello");
+        cmds.push("auth");
+        cmds.push("ping");
+        cmds.push("commands");
+        Ok(Value::Array(cmds.into_iter().map(|x| x.into()).collect()))
     }
 
     fn handle_ping(&mut self, _client: &mut Client, args: &mut Vec<Value>) -> Result<Value, Error> {
@@ -165,29 +164,33 @@ pub trait Handler: Send + Sized {
         mut command: Command,
     ) -> Result<Value, Error> {
         log::info!("command: ({}) {:?}", client.addrs()[0], command);
-        let mut x = handle.lock();
-        if !client.authenticated && !x.password_required() {
-            client.authenticated = true
-        }
 
-        match command.name() {
-            "hello" => return x.handle_hello(client, command.args()),
-            "auth" => return x.handle_auth(client, command.args()),
-            _ if !client.authenticated => return Error::disconnect("ERR invalid handshake"),
-            "commands" => return x.handle_commands(client, command.args()),
-            "ping" => return x.handle_ping(client, command.args_mut()),
-            _ => (),
-        }
+        let cmd = {
+            let mut x = handle.lock();
+            if !client.authenticated && !x.password_required() {
+                client.authenticated = true
+            }
 
-        if !client.authenticated {
-            return Error::disconnect("ERR unauthorized");
-        }
+            match command.name() {
+                "hello" => return x.handle_hello(client, command.args()),
+                "auth" => return x.handle_auth(client, command.args()),
+                _ if !client.authenticated => return Error::disconnect("ERR invalid handshake"),
+                "commands" => return x.handle_commands(client, command.args()),
+                "ping" => return x.handle_ping(client, command.args_mut()),
+                _ => (),
+            }
 
-        log::info!("command: ({}) {:?}", client.addrs()[0], command);
+            if !client.authenticated {
+                return Error::disconnect("ERR unauthorized");
+            }
 
-        let cmd = x.command(command.name()).map(|cmd| cmd.0.clone());
+            log::info!("command: ({}) {:?}", client.addrs()[0], command);
+
+            x.command(command.name()).map(|cmd| cmd.0.clone())
+        };
+
         if let Some(cmd) = cmd {
-            (cmd)(&mut x, client, command)
+            (cmd.as_ref())(handle, client, command).await
         } else {
             Ok(Value::error("NOCOMMAND invalid command"))
         }

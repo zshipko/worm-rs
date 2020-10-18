@@ -3,8 +3,8 @@ use crate::internal::*;
 pub struct Client {
     addrs: Vec<std::net::SocketAddr>,
     auth: Option<(String, String)>,
-    output: Encoder<tokio::io::WriteHalf<tokio::net::TcpStream>>,
-    input: Decoder<tokio::io::ReadHalf<tokio::net::TcpStream>>,
+    pub output: Encoder<tokio::io::WriteHalf<tokio::net::TcpStream>>,
+    pub input: Decoder<tokio::io::ReadHalf<tokio::net::TcpStream>>,
     pub(crate) authenticated: bool,
 }
 

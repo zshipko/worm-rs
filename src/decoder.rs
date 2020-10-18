@@ -54,17 +54,17 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(dest.parse()?)
     }
 
-    async fn read_simple_string(&mut self) -> Result<Value, Error> {
+    pub async fn read_simple_string(&mut self) -> Result<Value, Error> {
         let dest = self.get_line().await?;
         Ok(Value::String(dest))
     }
 
-    async fn read_simple_error(&mut self) -> Result<Value, Error> {
+    pub async fn read_simple_error(&mut self) -> Result<Value, Error> {
         let dest = self.get_line().await?;
         Ok(Value::Error(dest))
     }
 
-    async fn read_blob_string(&mut self) -> Result<Value, Error> {
+    pub async fn read_blob_string(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
         if len == 0 {
             self.skip_crlf();
@@ -80,22 +80,22 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         }
     }
 
-    async fn read_number(&mut self) -> Result<Value, Error> {
+    pub async fn read_number(&mut self) -> Result<Value, Error> {
         let n = self.get_number().await?;
         Ok(Value::Int(n))
     }
 
-    async fn read_null(&mut self) -> Result<Value, Error> {
+    pub async fn read_null(&mut self) -> Result<Value, Error> {
         self.skip_crlf();
         Ok(Value::Null)
     }
 
-    async fn read_double(&mut self) -> Result<Value, Error> {
+    pub async fn read_double(&mut self) -> Result<Value, Error> {
         let n = self.get_number().await?;
         Ok(Value::Float(n))
     }
 
-    async fn read_bool(&mut self) -> Result<Value, Error> {
+    pub async fn read_bool(&mut self) -> Result<Value, Error> {
         let line = self.get_line().await?;
         if line.len() > 1 {
             return Err(Error::InvalidByte(Some(line.as_bytes()[1])));
@@ -104,7 +104,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Bool(line.as_bytes()[0] == b't'))
     }
 
-    async fn read_blob_error(&mut self) -> Result<Value, Error> {
+    pub async fn read_blob_error(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
         let mut dest = vec![0; len];
         self.input.read_exact(&mut dest).await?;
@@ -117,7 +117,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         }
     }
 
-    async fn read_verbatim_string(&mut self) -> Result<Value, Error> {
+    pub async fn read_verbatim_string(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         // TODO: do something with the string type, here we are skipping it
@@ -132,12 +132,12 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         }
     }
 
-    async fn read_big_number(&mut self) -> Result<Value, Error> {
+    pub async fn read_big_number(&mut self) -> Result<Value, Error> {
         let line = self.get_line().await?;
         Ok(Value::BigNumber(line))
     }
 
-    async fn read_array(&mut self) -> Result<Value, Error> {
+    pub async fn read_array(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         let mut arr = Vec::with_capacity(len);
@@ -150,7 +150,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Array(arr))
     }
 
-    async fn read_map(&mut self) -> Result<Value, Error> {
+    pub async fn read_map(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         let mut map = Map::new();
@@ -164,7 +164,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Map(map))
     }
 
-    async fn read_attribute(&mut self) -> Result<Value, Error> {
+    pub async fn read_attribute(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         let mut map = Map::new();
@@ -180,7 +180,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Attribute(map, Box::new(value)))
     }
 
-    async fn read_set(&mut self) -> Result<Value, Error> {
+    pub async fn read_set(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         let mut set = Set::new();
@@ -193,7 +193,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Set(set))
     }
 
-    async fn read_push(&mut self) -> Result<Value, Error> {
+    pub async fn read_push(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
         let kind = match self.decode().await? {
             Value::String(s) => s,
@@ -210,11 +210,16 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Push(kind, arr))
     }
 
-    #[async_recursion]
-    pub async fn decode(&mut self) -> Result<Value, Error> {
+    pub async fn next_prefix(&mut self) -> Result<u8, Error> {
         let prefix = &mut [0u8];
         self.input.read_exact(prefix).await?;
-        match prefix[0] {
+        Ok(prefix[0])
+    }
+
+    #[async_recursion]
+    pub async fn decode(&mut self) -> Result<Value, Error> {
+        let prefix = self.next_prefix().await?;
+        match prefix {
             b'+' => self.read_simple_string().await,
             b'$' => self.read_blob_string().await,
             b'-' => self.read_simple_error().await,
