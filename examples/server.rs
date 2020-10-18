@@ -9,28 +9,32 @@ pub struct KV {
 }
 
 impl KV {
-    async fn set(this: Handle<Self>, _client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
+    async fn set(&mut self, _client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
         let key = command.pop_front();
         let value = command.pop_front();
-        this.lock().store.insert(key, value);
+        self.store.insert(key, value);
         Ok(Value::ok())
     }
 
-    async fn get(this: Handle<Self>, _client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
-        let args = command.args_mut();
-        let key = args.remove(0);
-        Ok(this.lock().store.get(&key).cloned().into())
+    async fn get(&mut self, client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
+        let key = command.pop_front();
+        if let Some(value) = self.store.get(&key) {
+            client.get_mut().write(value).await?;
+            return Value::done()
+        }
+
+        Ok(Value::Null)
     }
 
-    async fn del(this: Handle<Self>, _client: std::pin::Pin<&mut Client>, command: Command) -> Result<Value, Error> {
+    async fn del(&mut self, _client: std::pin::Pin<&mut Client>, command: Command) -> Result<Value, Error> {
         let args = command.args();
-        this.lock().store.remove(&args[0]);
+        self.store.remove(&args[0]);
         Ok(Value::ok())
     }
 
-    async fn list(this: Handle<Self>, client: std::pin::Pin<&mut Client>, _command: Command) -> Result<Value, Error> {
+    async fn list(&mut self, client: std::pin::Pin<&mut Client>, _command: Command) -> Result<Value, Error> {
         let client = client.get_mut();
-        let this = this.lock();
+        let this = self;
         client.output.write_array_header(this.store.len()).await?;
         for k in this.store.keys() {
             client.write(k).await?;

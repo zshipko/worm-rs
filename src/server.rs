@@ -1,10 +1,11 @@
 use crate::internal::*;
 
-pub struct Handle<T: Sized>(std::sync::Arc<std::sync::Mutex<T>>);
+
+pub struct Handle<T: Sized>(std::sync::Arc<tokio::sync::Mutex<T>>);
 
 impl<T: Sized> Handle<T> {
-    pub fn lock(&self) -> std::sync::MutexGuard<T> {
-        self.0.lock().unwrap()
+    pub async fn lock(&'_ self) -> tokio::sync::MutexGuard<'_, T> {
+        self.0.lock().await
     }
 }
 
@@ -26,11 +27,12 @@ macro_rules! commands {
             )*]
         }
 
-        fn call(this: Handle<Self>, client: std::pin::Pin<&mut $crate::Client>, command: $crate::Command) -> std::pin::Pin<Box<dyn 'static + Send + std::future::Future<Output = $crate::Response>>> {
-            Box::pin(async {
+        fn call(this: Handle<Self>, client: std::pin::Pin<&mut $crate::Client>, command: $crate::Command) -> std::pin::Pin<Box<dyn '_ + Send + std::future::Future<Output = $crate::Response>>> {
+            use std::ops::DerefMut;
+            Box::pin(async move {
                 match command.name() {
                     $(
-                        stringify!($x) => Self::$x(this, client, command).await,
+                        stringify!($x) => Self::$x(this.lock().await.deref_mut(), client, command).await,
                     )*
                     _ => Ok(Value::error("NOCOMMAND invalid command")),
                 }
@@ -43,7 +45,7 @@ const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 #[async_trait::async_trait]
 pub trait Handler: Send + Sized {
-    fn call(this: Handle<Self>, client: std::pin::Pin<&mut Client>, command: Command) -> std::pin::Pin<Box<dyn 'static + Send + std::future::Future<Output = Response>>>;
+    fn call(this: Handle<Self>, client: std::pin::Pin<&mut Client>, command: Command) -> std::pin::Pin<Box<dyn '_ + Send + std::future::Future<Output = Response>>>;
 
     fn commands(&self) -> &[&str];
 
@@ -145,7 +147,7 @@ pub trait Handler: Send + Sized {
         {
             log::info!("command: ({}) {:?}", client.addrs()[0], command);
 
-            let mut x = handle.lock();
+            let mut x = handle.lock().await;
             if !client.authenticated && !x.password_required() {
                 client.authenticated = true
             }
@@ -202,7 +204,7 @@ impl<T: 'static + Handler + Send> Server<T> {
 
     pub async fn run<A: tokio::net::ToSocketAddrs>(self, addr: A) -> Result<(), Error> {
         let conn = tokio::net::TcpListener::bind(addr).await?;
-        let data = std::sync::Arc::new(std::sync::Mutex::new(self.data));
+        let data = std::sync::Arc::new(tokio::sync::Mutex::new(self.data));
         loop {
             let (socket, addr) = conn.accept().await?;
             let data = data.clone();
