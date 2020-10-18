@@ -107,7 +107,6 @@ pub trait Handler: Send + Sized {
             return Error::disconnect("ERR password required");
         }
 
-
         return Ok(map! {
             "server" => "worm",
             "version" => VERSION,
@@ -125,12 +124,12 @@ pub trait Handler: Send + Sized {
         let username = if args.len() == 1 {
             "default"
         } else {
-            args[2].as_string().unwrap()
+            args[1].as_string().unwrap()
         };
 
         let password = args[if args.len() == 1 { 0 } else { 1 }]
-                .as_string()
-                .unwrap();
+            .as_string()
+            .unwrap();
 
         if !self._check_password(username, password) {
             return Error::disconnect("ERR invalid password");
@@ -138,21 +137,24 @@ pub trait Handler: Send + Sized {
 
         client.authenticated = true;
 
-        return Ok(Value::ok())
+        return Ok(Value::ok());
     }
-
 
     fn handle_commands(&mut self, _client: &mut Client, _args: &[Value]) -> Result<Value, Error> {
         let mut commands: Vec<Value> = self.commands().iter().map(|x| (*x).into()).collect();
-        commands.extend_from_slice(&["hello".into(), "auth".into(), "ping".into(), "commands".into()]);
+        commands.extend_from_slice(&[
+            "hello".into(),
+            "auth".into(),
+            "ping".into(),
+            "commands".into(),
+        ]);
         Ok(Value::Array(commands))
     }
 
-
-    fn handle_ping(&mut self, _client: &mut Client, args: &[Value]) -> Result<Value, Error> {
+    fn handle_ping(&mut self, _client: &mut Client, args: &mut Vec<Value>) -> Result<Value, Error> {
         if args.len() > 0 {
             Ok(args[0].clone())
-        } else  {
+        } else {
             Ok("PONG".into())
         }
     }
@@ -160,7 +162,7 @@ pub trait Handler: Send + Sized {
     async fn handle(
         handle: Handle<Self>,
         client: &mut Client,
-        command: Command,
+        mut command: Command,
     ) -> Result<Value, Error> {
         log::info!("command: ({}) {:?}", client.addrs()[0], command);
         let mut x = handle.lock();
@@ -173,7 +175,7 @@ pub trait Handler: Send + Sized {
             "auth" => return x.handle_auth(client, command.args()),
             _ if !client.authenticated => return Error::disconnect("ERR invalid handshake"),
             "commands" => return x.handle_commands(client, command.args()),
-            "ping" => return x.handle_ping(client, command.args()),
+            "ping" => return x.handle_ping(client, command.args_mut()),
             _ => (),
         }
 
@@ -207,7 +209,7 @@ async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<
                     response = false;
                     Value::Error(e)
                 }
-                Err(e) => Err(e).into()
+                Err(e) => Err(e).into(),
             };
             client.write(&res).await?;
             client.flush().await?;
@@ -229,7 +231,6 @@ impl<T: 'static + Handler + Send> Server<T> {
             let (socket, addr) = conn.accept().await?;
             let data = data.clone();
             tokio::spawn(async move {
-                let data = data.clone();
                 let mut client = Client::new_from_stream(socket, vec![addr], None)
                     .await
                     .unwrap();
@@ -238,12 +239,12 @@ impl<T: 'static + Handler + Send> Server<T> {
                         Ok(true) => continue,
                         Ok(false) => {
                             log::info!("disconnecting: {}", client.addrs()[0]);
-                            break
-                        },
+                            break;
+                        }
                         Err(e) => {
                             log::error!("fatal error: {:?}", e);
-                            break
-                        },
+                            break;
+                        }
                     }
                 }
             });

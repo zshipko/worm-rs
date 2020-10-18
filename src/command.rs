@@ -39,6 +39,14 @@ impl Command {
     pub fn split(self) -> (String, Vec<Value>) {
         (self.0, self.1)
     }
+
+    pub fn pop_front(&mut self) -> Value {
+        if self.1.len() == 0 {
+            Value::Null
+        } else {
+            self.1.remove(0)
+        }
+    }
 }
 
 impl From<Command> for Value {
