@@ -23,10 +23,12 @@ pub use command::Command;
 pub use decoder::Decoder;
 pub use encoder::Encoder;
 pub use error::Error;
-pub use server::{Commands, Func, Handle, Handler, Server};
+pub use server::{Handle, Handler, Response, Server};
 pub use value::{Float, Map, Set, Value};
 
 pub use worm_derive::Handler;
+
+pub use async_trait::async_trait;
 
 #[cfg(test)]
 mod tests;

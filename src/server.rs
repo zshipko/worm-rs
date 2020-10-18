@@ -17,11 +17,6 @@ pub struct Server<T> {
 
 pub type Response = Result<Value, Error>;
 
-type FuncType<T> = dyn Send + FnOnce(Handle<T>, &mut Client, Command) -> std::pin::Pin<Box<dyn Send + Sync + std::future::Future<Output = Response>>>;
-pub struct Func<T>(pub std::sync::Arc<FuncType<T>>);
-
-pub struct Commands<'a, T>(std::collections::BTreeMap<&'a str, Func<T>>);
-
 #[macro_export]
 macro_rules! commands {
     ($($x:ident),*$(,)?) => {
@@ -31,33 +26,16 @@ macro_rules! commands {
             )*]
         }
 
-        fn command(&self, name: &str) -> Option<Func<Self>> {
-            match name {
-                $(
-                    stringify!($x) => Some($crate::Func(Self::$x)),
-                )*
-                _ => None
-            }
+        fn call(this: Handle<Self>, client: std::pin::Pin<&mut $crate::Client>, command: $crate::Command) -> std::pin::Pin<Box<dyn 'static + Send + std::future::Future<Output = $crate::Response>>> {
+            Box::pin(async {
+                match command.name() {
+                    $(
+                        stringify!($x) => Self::$x(this, client, command).await,
+                    )*
+                    _ => Ok(Value::error("NOCOMMAND invalid command")),
+                }
+            })
         }
-    }
-}
-
-impl<'a, T> Commands<'a, T> {
-    pub fn new() -> Self {
-        Commands(Default::default())
-    }
-
-    pub fn add<F: 'static + Copy + Send + FnOnce(Handle<T>, &mut Client, Command) -> std::pin::Pin<Box<dyn Send + Sync + std::future::Future<Output = Response>>>>(
-        mut self,
-        key: &'a str,
-        f: std::sync::Arc<FuncType<T>>,
-    ) -> Self {
-        self.0.insert(key, Func(f));
-        self
-    }
-
-    pub fn get(&self, name: &str) -> Option<&Func<T>> {
-        self.0.get(name)
     }
 }
 
@@ -65,7 +43,8 @@ const VERSION: &'static str = env!("CARGO_PKG_VERSION");
 
 #[async_trait::async_trait]
 pub trait Handler: Send + Sized {
-    fn command(&self, name: &str) -> Option<Func<Self>>;
+    fn call(this: Handle<Self>, client: std::pin::Pin<&mut Client>, command: Command) -> std::pin::Pin<Box<dyn 'static + Send + std::future::Future<Output = Response>>>;
+
     fn commands(&self) -> &[&str];
 
     fn password_required(&self) -> bool;
@@ -163,9 +142,9 @@ pub trait Handler: Send + Sized {
         client: &mut Client,
         mut command: Command,
     ) -> Result<Value, Error> {
-        log::info!("command: ({}) {:?}", client.addrs()[0], command);
+        {
+            log::info!("command: ({}) {:?}", client.addrs()[0], command);
 
-        let cmd = {
             let mut x = handle.lock();
             if !client.authenticated && !x.password_required() {
                 client.authenticated = true
@@ -179,21 +158,15 @@ pub trait Handler: Send + Sized {
                 "ping" => return x.handle_ping(client, command.args_mut()),
                 _ => (),
             }
-
-            if !client.authenticated {
-                return Error::disconnect("ERR unauthorized");
-            }
-
-            log::info!("command: ({}) {:?}", client.addrs()[0], command);
-
-            x.command(command.name()).map(|cmd| cmd.0.clone())
-        };
-
-        if let Some(cmd) = cmd {
-            (cmd.as_ref())(handle, client, command).await
-        } else {
-            Ok(Value::error("NOCOMMAND invalid command"))
         }
+
+        if !client.authenticated {
+            return Error::disconnect("ERR unauthorized");
+        }
+
+        log::info!("command: ({}) {:?}", client.addrs()[0], command);
+
+        Self::call(handle, std::pin::Pin::new(client), command).await
     }
 }
 
