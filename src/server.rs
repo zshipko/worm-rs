@@ -27,7 +27,7 @@ macro_rules! commands {
             )*]
         }
 
-        fn call(this: Handle<Self>, client: std::pin::Pin<&mut $crate::Client>, command: $crate::Command) -> std::pin::Pin<Box<dyn '_ + Send + std::future::Future<Output = $crate::Response>>> {
+        fn call(this: worm::Handle<Self>, client: std::pin::Pin<&mut $crate::Client>, command: $crate::Command) -> std::pin::Pin<Box<dyn '_ + Send + std::future::Future<Output = $crate::Response>>> {
             use std::ops::DerefMut;
             Box::pin(async move {
                 match command.name() {
