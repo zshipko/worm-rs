@@ -27,7 +27,7 @@ impl Value {
         x.into()
     }
 
-    pub fn done() -> Result<Value, Error> {
+    pub fn done() -> Result<Value, anyhow::Error> {
         Ok(Value::Done)
     }
 

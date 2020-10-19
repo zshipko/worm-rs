@@ -16,11 +16,11 @@ pub struct Server<T> {
     data: T,
 }
 
-pub type Response = Result<Value, Error>;
+pub type Response = anyhow::Result<Value>;
 
 #[macro_export]
 macro_rules! commands {
-    ($($x:ident),*$(,)?) => {
+    ($($x:ident: $n:expr),*$(,)?) => {
         fn commands(&self) -> &[&str] {
             &[$(
                 stringify!($x),
@@ -32,7 +32,7 @@ macro_rules! commands {
             Box::pin(async move {
                 match command.name() {
                     $(
-                        stringify!($x) => Self::$x(this.lock().await.deref_mut(), client, command).await,
+                        $n => Self::$x(this.lock().await.deref_mut(), client, command).await,
                     )*
                     _ => Ok($crate::Value::error("NOCOMMAND invalid command")),
                 }
@@ -52,7 +52,7 @@ pub trait Handler: Send + Sized {
     fn password_required(&self) -> bool;
     fn _check_password(&self, _username: &str, _password: &str) -> bool;
 
-    fn handle_hello(&mut self, client: &mut Client, args: &[Value]) -> Result<Value, Error> {
+    fn handle_hello(&mut self, client: &mut Client, args: &[Value]) -> anyhow::Result<Value> {
         log::info!("hello: ({}) {:?}", client.addrs()[0], args);
         if args.len() == 0 {
             return Error::invalid_args("hello", 0, 1);
@@ -96,7 +96,7 @@ pub trait Handler: Send + Sized {
         });
     }
 
-    fn handle_auth(&mut self, client: &mut Client, args: &[Value]) -> Result<Value, Error> {
+    fn handle_auth(&mut self, client: &mut Client, args: &[Value]) -> anyhow::Result<Value> {
         log::info!("auth: ({}) {:?}", client.addrs()[0], args);
 
         if args.len() == 0 {
@@ -143,7 +143,7 @@ pub trait Handler: Send + Sized {
         handle: Handle<Self>,
         client: &mut Client,
         mut command: Command,
-    ) -> Result<Value, Error> {
+    ) -> anyhow::Result<Value> {
         {
             log::info!("command: ({}) {:?}", client.addrs()[0], command);
 
@@ -156,8 +156,8 @@ pub trait Handler: Send + Sized {
                 "hello" => return x.handle_hello(client, command.args()),
                 "auth" => return x.handle_auth(client, command.args()),
                 _ if !client.authenticated => return Error::disconnect("ERR invalid handshake"),
-                "commands" => return x.handle_commands(client, command.args()),
-                "ping" => return x.handle_ping(client, command.args_mut()),
+                "commands" => return x.handle_commands(client, command.args()).map_err(Into::into),
+                "ping" => return x.handle_ping(client, command.args_mut()).map_err(Into::into),
                 _ => (),
             }
         }
@@ -168,7 +168,9 @@ pub trait Handler: Send + Sized {
 
         log::info!("command: ({}) {:?}", client.addrs()[0], command);
 
-        Self::call(handle, std::pin::Pin::new(client), command).await
+        let value = Self::call(handle, std::pin::Pin::new(client), command).await?;
+        Ok(value)
+
     }
 }
 
@@ -180,14 +182,17 @@ async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<
         let name = cmd.remove(0);
         if let Value::String(s) = name {
             let cmd = Command::new(s).with_args(cmd);
-            let res = match T::handle(data, client, cmd).await {
+            let res = match T::handle(data, client, cmd).await  {
                 Ok(x) => x,
-                Err(Error::Disconnect(e)) => {
-                    log::info!("disconnect: ({}) {:?}", client.addrs()[0], e);
-                    response = false;
-                    Value::Error(e)
+                Err(e) =>  match e.downcast::<Error>()  {
+                    Ok(Error::Disconnect(e)) => {
+                        log::info!("disconnect: ({}) {:?}", client.addrs()[0], e);
+                        response = false;
+                        Value::Error(e)
+                    }
+                    Ok(e) => Err(e).into(),
+                    Err(e) => Err(e).into(),
                 }
-                Err(e) => Err(e).into(),
             };
             client.write(&res).await?;
             client.flush().await?;

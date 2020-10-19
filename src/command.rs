@@ -13,7 +13,7 @@ impl Command {
         self
     }
 
-    pub fn arg(mut self, x: impl Into<String>) -> Command {
+    pub fn arg(mut self, x: impl Into<Value>) -> Command {
         self.1.push(x.into().into());
         self
     }

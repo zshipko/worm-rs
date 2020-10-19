@@ -44,7 +44,7 @@ impl Client {
         let cmd = Command::new("HELLO").arg("3");
 
         let cmd = if let Some((user, pass)) = &client.auth {
-            cmd.arg("AUTH").arg(user).arg(pass)
+            cmd.arg("AUTH").arg(user.as_str()).arg(pass.as_str())
         } else {
             cmd
         };

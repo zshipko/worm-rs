@@ -22,14 +22,21 @@ pub enum Error {
 
     #[error("Disconnect: {0}")]
     Disconnect(String),
+
+    #[error("Error: {0}")]
+    Error(#[from] anyhow::Error),
 }
 
 impl Error {
-    pub fn disconnect(s: impl Into<String>) -> Result<Value, Error> {
-        Err(Error::Disconnect(s.into()))
+    pub fn disconnect(s: impl Into<String>) -> Result<Value, anyhow::Error> {
+        Err(Error::Disconnect(s.into()).into())
     }
 
-    pub fn invalid_args(cmd: impl AsRef<str>, got: usize, expected: usize) -> Result<Value, Error> {
+    pub fn invalid_args(
+        cmd: impl AsRef<str>,
+        got: usize,
+        expected: usize,
+    ) -> Result<Value, anyhow::Error> {
         Ok(Value::Error(format!(
             "ERR wrong number of arguments for {} command, got {} but expected {}",
             cmd.as_ref(),

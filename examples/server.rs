@@ -9,14 +9,14 @@ pub struct KV {
 }
 
 impl KV {
-    async fn set(&mut self, _client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
+    async fn set(&mut self, _client: std::pin::Pin<&mut Client>, mut command: Command) -> Response {
         let key = command.pop_front();
         let value = command.pop_front();
         self.store.insert(key, value);
         Ok(Value::ok())
     }
 
-    async fn get(&mut self, client: std::pin::Pin<&mut Client>, mut command: Command) -> Result<Value, Error> {
+    async fn get(&mut self, client: std::pin::Pin<&mut Client>, mut command: Command) -> Response {
         let key = command.pop_front();
         if let Some(value) = self.store.get(&key) {
             client.get_mut().write(value).await?;
@@ -26,13 +26,13 @@ impl KV {
         Ok(Value::Null)
     }
 
-    async fn del(&mut self, _client: std::pin::Pin<&mut Client>, command: Command) -> Result<Value, Error> {
+    async fn del(&mut self, _client: std::pin::Pin<&mut Client>, command: Command) -> Response {
         let args = command.args();
         self.store.remove(&args[0]);
         Ok(Value::ok())
     }
 
-    async fn list(&mut self, client: std::pin::Pin<&mut Client>, _command: Command) -> Result<Value, Error> {
+    async fn list(&mut self, client: std::pin::Pin<&mut Client>, _command: Command) -> Response {
         let client = client.get_mut();
         let this = self;
         client.output.write_array_header(this.store.len()).await?;

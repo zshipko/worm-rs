@@ -29,6 +29,7 @@ pub use value::{Float, Map, Set, Value};
 pub use worm_derive::Handler;
 
 pub use async_trait::async_trait;
+pub use tokio::net::ToSocketAddrs;
 
 #[cfg(test)]
 mod tests;
