@@ -34,7 +34,7 @@ macro_rules! commands {
                     $(
                         stringify!($x) => Self::$x(this.lock().await.deref_mut(), client, command).await,
                     )*
-                    _ => Ok(Value::error("NOCOMMAND invalid command")),
+                    _ => Ok($crate::Value::error("NOCOMMAND invalid command")),
                 }
             })
         }
