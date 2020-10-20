@@ -311,11 +311,14 @@ impl std::convert::TryFrom<Value> for String {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        if let Value::String(b) = value {
-            return Ok(b);
+        match value {
+            Value::Bool(b) => Ok(b.to_string()),
+            Value::String(s) => Ok(s),
+            Value::Int(i) => Ok(i.to_string()),
+            Value::Float(f) => Ok(f.to_string()),
+            Value::BigNumber(s) => Ok(s),
+            x => Err(Error::InvalidValue(x)),
         }
-
-        Err(Error::InvalidValue(value))
     }
 }
 
@@ -335,11 +338,15 @@ impl std::convert::TryFrom<Value> for Vec<u8> {
     type Error = Error;
 
     fn try_from(value: Value) -> Result<Self, Self::Error> {
-        if let Value::Bytes(b) = value {
-            return Ok(b);
+        match value {
+            Value::Bool(b) => Ok(b.to_string().into_bytes()),
+            Value::Bytes(b) => Ok(b),
+            Value::String(s) => Ok(s.into_bytes()),
+            Value::Int(i) => Ok(i.to_string().into_bytes()),
+            Value::Float(f) => Ok(f.to_string().into_bytes()),
+            Value::BigNumber(s) => Ok(s.into_bytes()),
+            x => Err(Error::InvalidValue(x)),
         }
-
-        Err(Error::InvalidValue(value))
     }
 }
 

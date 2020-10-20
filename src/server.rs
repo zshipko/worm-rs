@@ -221,11 +221,11 @@ impl<T: 'static + Handler + Send> Server<T> {
                     match on_command(Handle(data.clone()), &mut client).await {
                         Ok(true) => continue,
                         Ok(false) => {
-                            log::info!("disconnecting: {}", client.addrs()[0]);
+                            log::debug!("disconnecting: {}", client.addrs()[0]);
                             break;
                         }
                         Err(e) => {
-                            log::error!("fatal error: {:?}", e);
+                            log::debug!("fatal error: {:?}", e);
                             break;
                         }
                     }
