@@ -38,12 +38,12 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    async fn write_null(&mut self) -> Result<(), Error> {
+    pub async fn write_null(&mut self) -> Result<(), Error> {
         self.output.write_all(b"_").await?;
         self.write_crlf().await
     }
 
-    async fn write_bool(&mut self, b: &bool) -> Result<(), Error> {
+    pub async fn write_bool(&mut self, b: &bool) -> Result<(), Error> {
         if *b {
             self.output.write_all(b"#t").await?;
         } else {
@@ -52,25 +52,25 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         self.write_crlf().await
     }
 
-    async fn write_int(&mut self, i: &i64) -> Result<(), Error> {
+    pub async fn write_int(&mut self, i: &i64) -> Result<(), Error> {
         self.output.write_all(b":").await?;
         self.output.write_all(i.to_string().as_bytes()).await?;
         self.write_crlf().await
     }
 
-    async fn write_float(&mut self, i: &Float) -> Result<(), Error> {
+    pub async fn write_float(&mut self, i: &Float) -> Result<(), Error> {
         self.output.write_all(b",").await?;
         self.output.write_all(i.to_string().as_bytes()).await?;
         self.write_crlf().await
     }
 
-    async fn write_big_number(&mut self, i: &str) -> Result<(), Error> {
+    pub async fn write_big_number(&mut self, i: &str) -> Result<(), Error> {
         self.output.write_all(b"(").await?;
         self.output.write_all(i.as_bytes()).await?;
         self.write_crlf().await
     }
 
-    async fn write_error(&mut self, e: &str) -> Result<(), Error> {
+    pub async fn write_error(&mut self, e: &str) -> Result<(), Error> {
         if e.contains('\r') || e.contains('\n') {
             self.output
                 .write_all(format!("!{}", e.len()).as_bytes())
@@ -91,7 +91,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         self.write_string(e.as_ref()).await
     }
 
-    async fn write_string(&mut self, e: &[u8]) -> Result<(), Error> {
+    pub async fn write_string(&mut self, e: &[u8]) -> Result<(), Error> {
         if e.contains(&b'\r') || e.contains(&b'\n') {
             self.write_length('$', e.len()).await?;
         } else {
@@ -106,7 +106,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    async fn write_array(&mut self, arr: &[Value]) -> Result<(), Error> {
+    pub async fn write_array(&mut self, arr: &[Value]) -> Result<(), Error> {
         self.write_array_header(arr.len()).await?;
 
         for a in arr {
@@ -121,7 +121,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    async fn write_map(&mut self, map: &Map) -> Result<(), Error> {
+    pub async fn write_map(&mut self, map: &Map) -> Result<(), Error> {
         self.write_map_header(map.len()).await?;
 
         for (k, v) in map.iter() {
@@ -137,7 +137,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    async fn write_set(&mut self, set: &Set) -> Result<(), Error> {
+    pub async fn write_set(&mut self, set: &Set) -> Result<(), Error> {
         self.write_set_header(set.len()).await?;
 
         for a in set.iter() {
@@ -147,20 +147,14 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
         Ok(())
     }
 
-    async fn write_attribute(&mut self, attr: &Map) -> Result<(), Error> {
-        self.write_length('~', attr.len()).await?;
-
-        for (k, v) in attr {
-            self.encode(k).await?;
-            self.encode(v).await?;
-        }
-
+    pub async fn write_push_header(&mut self, kind: impl AsRef<str>, len: usize) -> Result<(), Error> {
+        self.write_length('>', len + 1).await?;
+        self.write_string(kind.as_ref().as_bytes()).await?;
         Ok(())
     }
 
-    async fn write_push(&mut self, kind: &str, values: &[Value]) -> Result<(), Error> {
-        self.write_length('>', values.len() + 1).await?;
-        self.write_string(kind.as_bytes()).await?;
+    pub async fn write_push(&mut self, kind: impl AsRef<str>, values: &[Value]) -> Result<(), Error> {
+        self.write_push_header(kind, values.len()).await?;
         for a in values {
             self.encode(a).await?;
         }
@@ -187,12 +181,7 @@ impl<T: Unpin + Send + AsyncWrite> Encoder<T> {
             Value::Array(a) => self.write_array(a.as_slice()).await,
             Value::Map(m) => self.write_map(m).await,
             Value::Set(s) => self.write_set(s).await,
-            Value::Attribute(attr, value) => {
-                self.write_attribute(attr).await?;
-                self.encode(&value).await
-            }
-            Value::Push(k, v) => self.write_push(k.as_str(), v.as_slice()).await,
-            Value::Done => Ok(())
+            Value::Push(name, m) => self.write_push(name, m.as_slice()).await,
         }
     }
 }

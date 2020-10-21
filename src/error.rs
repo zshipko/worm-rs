@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Error: {0}")]
     Error(#[from] anyhow::Error),
+
+    #[error("Use to signal when streaming data has been written")]
+    Done,
 }
 
 impl Error {

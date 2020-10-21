@@ -3,7 +3,7 @@
 Async RESP3 parser, client and server ported to Rust from [worm-go](https://github.com/zshipko/worm)
 
 ## Known limitations
-- Assumes an `Attribute` is always followed by a valid `Value`
+- Ignores all `Attribute` messages
 - Streaming strings and aggregated data types are not implemented yet
 
 ## Built-in commands

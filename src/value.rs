@@ -17,9 +17,7 @@ pub enum Value {
     Array(Vec<Value>),
     Map(Map),
     Set(Set),
-    Attribute(Map, Box<Value>),
     Push(String, Vec<Value>),
-    Done
 }
 
 impl Value {
@@ -28,7 +26,7 @@ impl Value {
     }
 
     pub fn done() -> Result<Value, anyhow::Error> {
-        Ok(Value::Done)
+        Err(Error::Done.into())
     }
 
     pub fn error(x: impl Into<String>) -> Value {

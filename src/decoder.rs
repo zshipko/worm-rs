@@ -164,7 +164,8 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
         Ok(Value::Map(map))
     }
 
-    pub async fn read_attribute(&mut self) -> Result<Value, Error> {
+    // Ignore attributes and read next value
+    async fn skip_attribute(&mut self) -> Result<Value, Error> {
         let len = self.get_number::<usize>().await?;
 
         let mut map = Map::new();
@@ -175,9 +176,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
             map.insert(key, value);
         }
 
-        let value = self.decode().await?;
-
-        Ok(Value::Attribute(map, Box::new(value)))
+        self.decode().await
     }
 
     pub async fn read_set(&mut self) -> Result<Value, Error> {
@@ -233,7 +232,7 @@ impl<T: AsyncRead + Unpin + Send> Decoder<T> {
             b'*' => self.read_array().await,
             b'%' => self.read_map().await,
             b'~' => self.read_set().await,
-            b'|' => self.read_attribute().await,
+            b'|' => self.skip_attribute().await,
             b'>' => self.read_push().await,
             _ => Err(Error::InvalidByte(None)),
         }

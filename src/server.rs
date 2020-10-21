@@ -190,6 +190,10 @@ async fn on_command<T: Handler>(data: Handle<T>, client: &mut Client) -> Result<
                         response = false;
                         Value::Error(e)
                     }
+                    Ok(Error::Done) => {
+                        client.flush().await?;
+                        return Ok(true)
+                    }
                     Ok(e) => Err(e).into(),
                     Err(e) => Err(e).into(),
                 }
